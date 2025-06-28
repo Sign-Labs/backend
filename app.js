@@ -1,9 +1,9 @@
 import express from 'express';
-import pg from 'pg';
-const { Pool } = pg;
+
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { register } from './function.js';
 dotenv.config();
 
 const app = express();
@@ -15,23 +15,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // PostgreSQL connection pool
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_DATABASE,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
 
-// Test database connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to PostgreSQL database:', err);
-    return;
-  }
-  console.log('Connected to PostgreSQL database successfully');
-  release();
-});
+
+
 
 
 
@@ -44,49 +30,15 @@ app.get('/',  (req, res) => {
 app.post('/register',async (req,res)=>
   
 {
-   const client = await pool.connect();
-   const {
-      username,name,surname,tel,sex,birthday,email,password} = req.body;
-    const hashpassword  = await hashPassword(password)
-
-      const values =[
-      username,
-      name,
-      surname,
-      tel,
-      sex,birthday,email,hashpassword 
-      ,point=0
-
-      ]
-
-      
-
-  const insertQuery = `
-      INSERT INTO users (username, name, surname, tel, sex, birthday, email, password, point)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING  username, name, surname, tel, sex, birthday, email, point
-    `;
-
-    const result = await client.query(insertQuery, values);
-    const newUser = result.rows[0];
-
-    // Success response
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      user: {
-        id: newUser.id,
-        username: newUser.username,
-        name: newUser.name,
-        surname: newUser.surname,
-        tel: newUser.tel,
-        sex: newUser.sex,
-        birthday: newUser.birthday,
-        email: newUser.email,
-        
-      } })
-
-      client.release();
+   try {
+    const result = await register(req.body);
+    res.status(201).json(result);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
   });
 
 

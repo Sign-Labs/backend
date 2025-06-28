@@ -28,7 +28,8 @@ export async function comparePassword(password, hashedPassword) {
 
 
 
-const jwt = require('jsonwebtoken');
+import jsonwebtoken from 'jsonwebtoken';
+const {jwt} = jsonwebtoken 
 
 const SECRET = "your_secret_key";
 
@@ -69,7 +70,7 @@ export function authenticateToken(req, res, next) {
     });
 }
 
-function decodeToken(token){
+export function decodeToken(token){
     const decodedToken = jwt.decode(token)
 
     return decodedToken;

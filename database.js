@@ -1,6 +1,27 @@
-const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
+import {hashPassword, comparePassword,createToken, decodeToken, authenticateToken} from './encryption.js';
+import pkg from 'pg';
+const { Pool } = pkg;
 
-const register = async (userData) => {
+  const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_DATABASE,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
+
+// Test database connection
+pool.connect((err, client, release) => {
+  if (err) {
+    console.error('Error connecting to PostgreSQL database:', err);
+    return;
+  }
+  console.log('Connected to PostgreSQL database successfully');
+  release();
+});
+
+
+export async function register(userData)  {
   const client = await pool.connect();
   
   try {
@@ -55,4 +76,3 @@ const register = async (userData) => {
   }
 };
 
-module.exports ={register}
