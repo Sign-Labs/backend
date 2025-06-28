@@ -3,7 +3,7 @@ import express from 'express';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register } from './database.js';
+import { register,login } from './database.js';
 dotenv.config();
 
 const app = express();
@@ -42,12 +42,46 @@ app.post('/register',async (req,res)=>
   });
 
 
-app.post('/login', async(req,res) =>{
+app.post('/login', async (req, res) => {
+  try {
+    // Validate request body
+    if (!req.body) {
+      return res.status(400).json({
+        success: false,
+        message: 'Request body is required'
+      });
+    }
 
-  const client = await pool.connect();
-  
+    const { username, password } = req.body;
 
-})
+    // Additional validation
+    if (!username?.trim() || !password?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username/email and password are required'
+      });
+    }
+
+    const result = await login(req.body);
+    res.status(200).json(result);
+
+  } catch (error) {
+    console.error('Login endpoint error:', error);
+    
+    // Handle different types of errors
+    if (error.message.includes('Invalid credentials')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid username/email or password'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+});
 
 
 app.get('/test-db', async (req, res) => {
