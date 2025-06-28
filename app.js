@@ -3,7 +3,7 @@ import express from 'express';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register } from './function.js';
+import { register } from './database.js';
 dotenv.config();
 
 const app = express();
