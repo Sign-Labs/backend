@@ -1,0 +1,10 @@
+npm install
+
+install redis on docker 
+
+
+
+#run
+node app.js
+
+
