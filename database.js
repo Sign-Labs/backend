@@ -200,9 +200,9 @@ const transporter = nodemailer.createTransport({
 
 export async function sendOtpEmail(to, otp) {
   const info = await transporter.sendMail({
-    from: `"OTP Service" <${process.env.SMTP_USER}>`,
+    from: `"SignLab" <${process.env.SMTP_USER}>`,
     to,
-    subject: "Your OTP Code",
+    subject: "Your OTP Code for Register",
     html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`,
   });
 
