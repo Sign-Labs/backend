@@ -1,10 +1,11 @@
-npm install
+1.npm install
 
-install redis on docker 
+2.##install redis on docker## 
+docker run -d --name redis-server -p 6379:6379 redis:alpine
 
 
 
-#run
+3#run
 node app.js
 
 
