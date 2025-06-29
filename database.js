@@ -5,6 +5,10 @@ import dotenv from 'dotenv';
 dotenv.config();
 import bcrypt from 'bcrypt';
 import jkg from 'jsonwebtoken';
+import nodemailer from 'nodemailer';
+import crypto from 'crypto';
+import { createClient } from 'redis';
+
 const jwt = jkg;
 const JWT_SECRET = process.env.JWT_SECRET ;
 
@@ -159,4 +163,48 @@ export async function login(loginData) {
   } finally {
     client.release();
   }
+}
+
+
+
+
+const redisClient = createClient();
+await redisClient.connect();
+
+export async function generateOtp(email) {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const key = `otp:${email}`;
+  await redisClient.set(key, otp, { EX: 300 }); // 5 นาที
+  return otp;
+}
+
+export async function verifyOtp(email, inputOtp) {
+  const key = `otp:${email}`;
+  const realOtp = await redisClient.get(key);
+  if (!realOtp) return false;
+  const isValid = realOtp === inputOtp;
+  if (isValid) await redisClient.del(key);
+  return isValid;
+}
+
+
+const transporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  secure: false, // TLS
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+});
+
+export async function sendOtpEmail(to, otp) {
+  const info = await transporter.sendMail({
+    from: `"OTP Service" <${process.env.SMTP_USER}>`,
+    to,
+    subject: "Your OTP Code",
+    html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`,
+  });
+
+  console.log(" Email sent:", info.messageId);
 }

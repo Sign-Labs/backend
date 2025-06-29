@@ -3,7 +3,7 @@ import express from 'express';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp } from './database.js';
 dotenv.config();
 
 const app = express();
@@ -115,6 +115,41 @@ app.get('/test-db', async (req, res) => {
     client.release();
   }
 });
+
+
+
+app.post('/send-otp', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const otp = await generateOtp(email);
+  await sendOtpEmail(email, otp);
+
+  res.json({ message: 'OTP sent to email' });
+});
+
+app.post('/verify-otp', async (req, res) => {
+  const { email, otp } = req.body;
+  if (!email || !otp) return res.status(400).json({ error: 'Email and OTP required' });
+
+  const isValid = await verifyOtp(email, otp);
+  if (isValid) {
+    res.json({ success: true, message: 'OTP verified' });
+  } else {
+    res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
 
 
 
