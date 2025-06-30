@@ -1,9 +1,9 @@
 import express from 'express';
-
+import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified  } from './database.js';
 dotenv.config();
 
 const app = express();
@@ -27,7 +27,7 @@ app.get('/',  (req, res) => {
 });
 
 
-app.post('/register',async (req,res)=>
+app.post('/register',checkOtpVerified,async (req,res)=>
   
 {
    try {
@@ -144,7 +144,17 @@ app.post('/verify-otp', async (req, res) => {
 
 
 
+const redis = createClient();
 
+redis.on('error', (err) => console.error('❌ Redis Error:', err));
+redis.on('connect', () => console.log('✅ Redis connected'));
+
+await redis.connect();
+
+const pong = await redis.ping();
+console.log('📡 Redis PING response:', pong);
+
+await redis.quit();
 
 
 
