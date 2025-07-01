@@ -130,14 +130,10 @@ export async function login(loginData) {
 
     // Generate JWT token
     const token = jwt.sign(
-      { 
-        userId: user.id, 
-        username: user.username,
-        email: user.email 
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
+  { id: user.id, username: user.username }, // ต้องมี id!
+  process.env.JWT_SECRET,
+  { expiresIn: '1h' }
+);
 
     // Return user data (without password) and token
     return {
@@ -284,3 +280,52 @@ const updateQuery = `
 
  
 }
+
+
+
+export async function changePassword(userId, currentPassword, newPassword) {
+  const client = await pool.connect();
+  try {
+    // 1. Get current hashed password from DB
+    const result = await client.query(
+      'SELECT password FROM users WHERE id = $1',
+      [userId]
+    );
+
+    if (result.rowCount === 0) {
+      throw new Error('User not found');
+    }
+
+    const user = result.rows[0];
+
+    // 2. Compare current password
+    const isMatch = await comparePassword(currentPassword, user.password);
+    if (!isMatch) {
+      throw new Error('Current password is incorrect');
+    }
+
+    // 3. Hash new password
+    const newHashed = await hashPassword(newPassword);
+
+    // 4. Update password in DB
+    await client.query(
+      'UPDATE users SET password = $1 WHERE id = $2',
+      [newHashed, userId]
+    );
+
+    return true;
+  } finally {
+    client.release();
+  }
+}
+
+
+
+
+
+
+
+
+
+
+

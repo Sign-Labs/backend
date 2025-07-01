@@ -3,7 +3,8 @@ import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword  } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword  } from './database.js';
+import { authenticateToken } from './encryption.js';
 dotenv.config();
 
 const app = express();
@@ -162,11 +163,35 @@ app.post('/verify-otp', async (req, res) => {
 
 
 app.post('/forget-password', checkOtpVerified, async (req, res) => {
+  
   const { email, newPassword, confirmPassword } = req.body;
 
   
-  await resetPassword(email, newPassword, confirmPassword);
+  await resetPassword(user.userData.email, newPassword, confirmPassword);
   res.json({ message: "Password reset successful" });
+});
+
+
+
+app.post('/change-password', authenticateToken, async (req, res) => {
+  const { currentPassword, newPassword, confirmPassword } = req.body;
+      const userId = req.user.id;
+  
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    return res.status(400).json({ error: 'All fields are required' });
+  }
+
+  if (newPassword !== confirmPassword) {
+    return res.status(400).json({ error: 'New passwords do not match' });
+  }
+
+  try {
+    await changePassword(userId, currentPassword, newPassword);
+    res.json({ message: 'Password changed successfully' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 });
 
 

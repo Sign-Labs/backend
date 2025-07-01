@@ -1,4 +1,6 @@
 import bcrypt from 'bcrypt';
+import dotenv from 'dotenv';
+dotenv.config();
 
 export async function hashPassword(password) {
     const saltRounds = 10
@@ -28,10 +30,9 @@ export async function comparePassword(password, hashedPassword) {
 
 
 
-import jsonwebtoken from 'jsonwebtoken';
-const {jwt} = jsonwebtoken 
+import jwt from 'jsonwebtoken';
 
-const SECRET = "your_secret_key";
+const SECRET = process.env.JWT_SECRET ;
 
 export function createToken(data){
 
@@ -52,22 +53,22 @@ export function createToken(data){
 
 
 export function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
 
-    console.log(token)
+  if (!token) return res.status(401).json({ message: 'Access Denied' });
 
-    if (!token) return res.status(401).json({ message: 'Access Denied' });
+  jwt.verify(token, SECRET, (err, user) => {
+    if (err) {
+      console.log("Invalid Token");
+      return res.status(403).json({ message: 'Invalid Token' });
+    }
 
-    jwt.verify(token, SECRET, { expiresIn: '24h' },(err, user) => {
-        if (err) {
-            console.log("Invaild Token")
-            return res.status(403).json({message: 'Invalid Token'});
-        }
-        console.log("JWT PASSED")
-        req.user = user;
-        next();
-    });
+    console.log("JWT PASSED");
+    console.log('JWT payload:', user); // 👈 ตรวจว่า user มี id จริงไหม
+    req.user = user;
+    next();
+  });
 }
 
 export function decodeToken(token){
