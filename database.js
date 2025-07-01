@@ -206,12 +206,12 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-export async function sendOtpEmail(to, otp) {
+export async function sendOtpEmail(to, otp, subject, html) {
   const info = await transporter.sendMail({
     from: `"SignLab" <${process.env.SMTP_USER}>`,
     to,
-    subject: "Your OTP Code for Register",
-    html: `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`,
+    subject: subject,
+    html: html,
   });
 
   console.log(" Email sent:", info.messageId);
@@ -229,4 +229,58 @@ export async function checkOtpVerified(req, res, next) {
   if (!parsed.verified) return res.status(403).json({ error: 'Email not verified via OTP' });
 
   next();
+}
+
+
+export async function resetPassword(email, newPassword, confirmPassword) {
+   const client = await pool.connect();
+  if (!email || !newPassword || !confirmPassword) {
+    return res.status(400).json({ error: 'all field required' });
+  }
+
+  if (newPassword !== confirmPassword) {
+   return res.status(400).json({ error: 'password not match' });
+  }
+
+  const data = await redisClient.get(`otp:${email}`);
+  if (!data) {
+   return res.status(400).json({ error: 'OTP not correct or expired' });
+  }
+
+  const parsed = JSON.parse(data);
+  if (!parsed.verified) {
+    return res.status(403).json({ error: 'Email not verified via OTP' });
+  }
+
+  
+  const passwordHash = await hashPassword(newPassword); 
+
+  // update password ใน DB
+const updateQuery = `
+    UPDATE users SET password = $1 WHERE email = $2
+    RETURNING id
+  `;
+
+  
+
+  try {
+    const result = await client.query(updateQuery, [passwordHash, email]);
+
+    if (result.rowCount === 0) {
+      throw new Error('User not found');
+    }
+
+    // ✅ ลบ OTP key ออก (ความปลอดภัย)
+    await redisClient.del(`otp:${email}`);
+    return true;
+
+  } finally {
+     await redisClient.del(`otp:${email}`);
+     client.release(); 
+  return true;
+  
+  }
+
+
+ 
 }

@@ -3,7 +3,7 @@ import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified  } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword  } from './database.js';
 dotenv.config();
 
 const app = express();
@@ -123,10 +123,23 @@ app.post('/send-otp', async (req, res) => {
   if (!email) return res.status(400).json({ error: 'Email is required' });
 
   const otp = await generateOtp(email);
-  await sendOtpEmail(email, otp);
+  await sendOtpEmail(email, otp,"Your OTP Code for Register",`<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`);
 
   res.json({ message: 'OTP sent to email' });
 });
+
+
+app.post('/otp-forget', async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email is required' });
+
+  const otp = await generateOtp(email);
+  await sendOtpEmail(email, otp,"Your OTP Code for Reset password",`<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`);
+
+  res.json({ message: 'OTP sent to email' });
+});
+
+
 
 app.post('/verify-otp', async (req, res) => {
   const { email, otp } = req.body;
@@ -144,6 +157,22 @@ app.post('/verify-otp', async (req, res) => {
 
 
 
+
+
+
+
+app.post('/forget-password', checkOtpVerified, async (req, res) => {
+  const { email, newPassword, confirmPassword } = req.body;
+
+  
+  await resetPassword(email, newPassword, confirmPassword);
+  res.json({ message: "Password reset successful" });
+});
+
+
+
+
+
 const redis = createClient();
 
 redis.on('error', (err) => console.error('❌ Redis Error:', err));
@@ -155,12 +184,6 @@ const pong = await redis.ping();
 console.log('📡 Redis PING response:', pong);
 
 await redis.quit();
-
-
-
-
-
-
 
 
 
