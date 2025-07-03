@@ -3,7 +3,7 @@ import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword  } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
 
@@ -85,37 +85,6 @@ app.post('/login', async (req, res) => {
 });
 
 
-app.get('/test-db', async (req, res) => {
-  const client = await pool.connect();
-  try {
-    
-
-    // ลองสร้างตาราง
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS test_connection (
-        id SERIAL PRIMARY KEY,
-        message TEXT
-      )
-    `);
-
-    // ลอง insert ข้อมูล
-    const insertResult = await client.query(
-      `INSERT INTO test_connection (message) VALUES ($1) RETURNING *`,
-      ['Hello from Node.js']
-    );
-
-    res.json({
-      success: true,
-      message: 'Connected and table tested successfully',
-      data: insertResult.rows[0]
-    });
-  } catch (err) {
-    console.error('Test connection error:', err);
-    res.status(500).json({ success: false, error: err.message });
-  } finally {
-    client.release();
-  }
-});
 
 
 
@@ -193,6 +162,12 @@ app.post('/change-password', authenticateToken, async (req, res) => {
     res.status(400).json({ error: err.message });
   }
 });
+
+
+app.get("/getdata",authenticateToken,getUserData);
+
+
+
 
 
 

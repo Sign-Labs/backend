@@ -320,6 +320,39 @@ export async function changePassword(userId, currentPassword, newPassword) {
 }
 
 
+export async function getUserData(req, res) {
+  const client = await pool.connect();
+  try {
+    const userId = req.user.id; // จาก token
+    
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    const result = await client.query(`
+      SELECT id, username, name, surname, tel, sex, birthday, email, point
+      FROM users
+      WHERE id = $1
+    `, [userId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const user = result.rows[0];
+
+    res.json({ success: true, user });
+
+  } catch (err) {
+    console.error('Error getting user data:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+  finally{
+    client.release();
+  }
+}
+
 
 
 
