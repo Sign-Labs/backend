@@ -356,8 +356,95 @@ export async function getUserData(req, res) {
 
 
 
+export async function getQuestionsByLesson(req, res) {
+  const lessonId = req.params.lessonId;
+
+  try {
+    const result = await pool.query(`
+      SELECT 
+        q.id AS question_id,
+        q.question_text,
+        c.id AS choice_id,
+        c.choice_text
+      FROM questions q
+      JOIN choices c ON q.id = c.question_id
+      WHERE q.lesson_id = $1
+      ORDER BY q.id, c.id
+    `, [lessonId]);
+
+    // แปลงผลให้ group choices ต่อคำถาม
+    const questionsMap = {};
+
+    result.rows.forEach(row => {
+      const { question_id, question_text, choice_id, choice_text } = row;
+
+      if (!questionsMap[question_id]) {
+        questionsMap[question_id] = {
+          question_id,
+          question_text,
+          choices: []
+        };
+      }
+
+      questionsMap[question_id].choices.push({
+        choice_id,
+        choice_text
+      });
+    });
+
+    res.json({ success: true, questions: Object.values(questionsMap) });
+
+  } catch (err) {
+    console.error('Error fetching questions:', err);
+    res.status(500).json({ success: false, message: 'Failed to get questions' });
+  }
+  finally{
+    pool.release();
+  }
+}
 
 
+export async function submitAnswer(req, res) {
+  const { user_id, question_id, selected_choice_id } = req.body;
+
+  if (!user_id || !question_id || !selected_choice_id) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  try {
+    // ตรวจสอบว่าตอบถูกหรือไม่
+    const check = await pool.query(
+      `SELECT is_correct FROM choices WHERE id = $1`,
+      [selected_choice_id]
+    );
+
+    if (check.rowCount === 0) {
+      return res.status(400).json({ success: false, message: 'Choice not found' });
+    }
+
+    const is_correct = check.rows[0].is_correct;
+
+    // บันทึกคำตอบ (หากเคยตอบแล้ว ให้ update)
+    await pool.query(`
+      INSERT INTO user_answers (user_id, question_id, selected_choice_id, is_correct)
+      VALUES ($1, $2, $3, $4)
+      ON CONFLICT (user_id, question_id)
+      DO UPDATE SET
+        selected_choice_id = EXCLUDED.selected_choice_id,
+        is_correct = EXCLUDED.is_correct,
+        answered_at = CURRENT_TIMESTAMP
+    `, [user_id, question_id, selected_choice_id, is_correct]);
+
+    res.json({ success: true, is_correct });
+
+  } catch (err) {
+    console.error('Error submitting answer:', err);
+    res.status(500).json({ success: false, message: 'Submit failed' });
+  }
+  finally{
+    pool.release();
+  }
+}
 
 
 

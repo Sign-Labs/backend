@@ -3,7 +3,7 @@ import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData  } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
 
@@ -184,6 +184,16 @@ const pong = await redis.ping();
 console.log('📡 Redis PING response:', pong);
 
 await redis.quit();
+
+
+
+app.get('/questions/:lessonId',authenticateToken ,getQuestionsByLesson);
+app.post('/answer', authenticateToken,submitAnswer);
+
+
+
+
+
 
 
 
