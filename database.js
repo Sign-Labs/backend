@@ -12,7 +12,7 @@ import { createClient } from 'redis';
 const jwt = jkg;
 const JWT_SECRET = process.env.JWT_SECRET ;
 
-  const pool = new Pool({
+ export const pool = new Pool({
   host: process.env.DB_HOST,
   port: process.env.DB_PORT,
   database: process.env.DB_DATABASE,
@@ -358,9 +358,9 @@ export async function getUserData(req, res) {
 
 export async function getQuestionsByLesson(req, res) {
   const lessonId = req.params.lessonId;
-
+  const client = await pool.connect();
   try {
-    const result = await pool.query(`
+    const result = await client.query(`
       SELECT 
         q.id AS question_id,
         q.question_text,
@@ -399,21 +399,22 @@ export async function getQuestionsByLesson(req, res) {
     res.status(500).json({ success: false, message: 'Failed to get questions' });
   }
   finally{
-    pool.release();
+    client.release();
   }
 }
 
 
 export async function submitAnswer(req, res) {
-  const { user_id, question_id, selected_choice_id } = req.body;
 
+  const { user_id, question_id, selected_choice_id } = req.body;
+   const client = await pool.connect();
   if (!user_id || !question_id || !selected_choice_id) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
 
   try {
     // ตรวจสอบว่าตอบถูกหรือไม่
-    const check = await pool.query(
+    const check = await client.query(
       `SELECT is_correct FROM choices WHERE id = $1`,
       [selected_choice_id]
     );
@@ -425,7 +426,7 @@ export async function submitAnswer(req, res) {
     const is_correct = check.rows[0].is_correct;
 
     // บันทึกคำตอบ (หากเคยตอบแล้ว ให้ update)
-    await pool.query(`
+    await client.query(`
       INSERT INTO user_answers (user_id, question_id, selected_choice_id, is_correct)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (user_id, question_id)
@@ -442,7 +443,7 @@ export async function submitAnswer(req, res) {
     res.status(500).json({ success: false, message: 'Submit failed' });
   }
   finally{
-    pool.release();
+    client.release();
   }
 }
 
