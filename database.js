@@ -6,7 +6,6 @@ dotenv.config();
 import bcrypt from 'bcrypt';
 import jkg from 'jsonwebtoken';
 import nodemailer from 'nodemailer';
-import crypto from 'crypto';
 import { createClient } from 'redis';
 
 const jwt = jkg;
@@ -405,17 +404,20 @@ export async function getQuestionsByLesson(req, res) {
 
 
 export async function submitAnswer(req, res) {
-
   const { user_id, question_id, selected_choice_id } = req.body;
-   const client = await pool.connect();
+  const client = await pool.connect();
+
   if (!user_id || !question_id || !selected_choice_id) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
 
   try {
-    // ตรวจสอบว่าตอบถูกหรือไม่
+    // 1. ตรวจสอบว่า choice ที่เลือกมีอยู่ และถูกหรือไม่
     const check = await client.query(
-      `SELECT is_correct FROM choices WHERE id = $1`,
+      `SELECT c.is_correct, q.lesson_id
+       FROM choices c
+       JOIN questions q ON c.question_id = q.id
+       WHERE c.id = $1`,
       [selected_choice_id]
     );
 
@@ -423,30 +425,203 @@ export async function submitAnswer(req, res) {
       return res.status(400).json({ success: false, message: 'Choice not found' });
     }
 
-    const is_correct = check.rows[0].is_correct;
+    const { is_correct, lesson_id } = check.rows[0];
 
-    // บันทึกคำตอบ (หากเคยตอบแล้ว ให้ update)
+    // 2. INSERT หรือ UPDATE คำตอบ พร้อม lesson_id
     await client.query(`
-      INSERT INTO user_answers (user_id, question_id, selected_choice_id, is_correct)
-      VALUES ($1, $2, $3, $4)
+      INSERT INTO user_answers (user_id, lesson_id, question_id, selected_choice_id, is_correct)
+      VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (user_id, question_id)
       DO UPDATE SET
         selected_choice_id = EXCLUDED.selected_choice_id,
         is_correct = EXCLUDED.is_correct,
+        lesson_id = EXCLUDED.lesson_id,
         answered_at = CURRENT_TIMESTAMP
-    `, [user_id, question_id, selected_choice_id, is_correct]);
+    `, [user_id, lesson_id, question_id, selected_choice_id, is_correct]);
 
     res.json({ success: true, is_correct });
 
   } catch (err) {
     console.error('Error submitting answer:', err);
     res.status(500).json({ success: false, message: 'Submit failed' });
-  }
-  finally{
+  } finally {
     client.release();
   }
 }
 
 
 
+export async function checkAndAwardLessonCompletionFast(userId, lessonId, pointToAdd = 10) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
+    // 1. ตรวจว่าเคยผ่านบทเรียนนี้ไปแล้วหรือยัง
+    const passed = await client.query(`
+      SELECT 1 FROM user_completed_lessons
+      WHERE user_id = $1 AND lesson_id = $2
+    `, [userId, lessonId]);
+
+    if (passed.rowCount > 0) {
+      await client.query('ROLLBACK');
+      return { success: false, message: 'บทเรียนนี้ผ่านไปแล้ว ไม่สามารถรับคะแนนซ้ำได้' };
+    }
+
+    // 2. นับคำถามทั้งหมดของบทเรียน
+    const totalQ = await client.query(`
+      SELECT COUNT(*) FROM questions
+      WHERE lesson_id = $1
+    `, [lessonId]);
+    const totalQuestions = Number(totalQ.rows[0].count);
+
+    // 3. นับจำนวนคำถามที่ user ตอบ "ถูก" แล้วในบทเรียนนั้น
+    const correctQ = await client.query(`
+      SELECT COUNT(DISTINCT question_id) FROM user_answers
+      WHERE user_id = $1 AND lesson_id = $2 AND is_correct = true
+    `, [userId, lessonId]);
+    const correctCount = Number(correctQ.rows[0].count);
+
+    if (correctCount === totalQuestions && totalQuestions > 0) {
+      // 4. ตอบถูกครบทุกข้อ → บันทึกว่า "ผ่าน" + ให้คะแนน
+      await client.query(`
+        INSERT INTO user_completed_lessons (user_id, lesson_id)
+        VALUES ($1, $2)
+      `, [userId, lessonId]);
+
+      await client.query(`
+        UPDATE users
+        SET point = point + $1
+        WHERE id = $2
+      `, [pointToAdd, userId]);
+
+      await client.query('COMMIT');
+      return {
+        success: true,
+        message: `🎉 ผ่านบทเรียนและได้รับ ${pointToAdd} คะแนน`,
+        awarded: true
+      };
+    } else {
+      await client.query('ROLLBACK');
+      return {
+        success: false,
+        message: `คุณตอบถูก ${correctCount}/${totalQuestions} ข้อ ยังไม่ครบ`,
+        awarded: false
+      };
+    }
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error awarding lesson (fast version):', err);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+
+export async function multiplesubmitAnswers(req, res) {
+  const { user_id, answers } = req.body;
+
+  if (!user_id || !Array.isArray(answers) || answers.length === 0) {
+    return res.status(400).json({ success: false, message: 'Invalid input' });
+  }
+
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // เตรียมคำสั่ง SQL
+    const results = [];
+
+    for (const { question_id, selected_choice_id } of answers) {
+      // ตรวจสอบ choice และดึง is_correct + lesson_id
+      const check = await client.query(`
+        SELECT c.is_correct, q.lesson_id
+        FROM choices c
+        JOIN questions q ON c.question_id = q.id
+        WHERE c.id = $1 AND q.id = $2
+      `, [selected_choice_id, question_id]);
+
+      if (check.rowCount === 0) {
+        results.push({
+          question_id,
+          success: false,
+          message: 'Choice or question not found'
+        });
+        continue;
+      }
+
+      const { is_correct, lesson_id } = check.rows[0];
+
+      // INSERT หรือ UPDATE คำตอบ
+      await client.query(`
+        INSERT INTO user_answers (user_id, lesson_id, question_id, selected_choice_id, is_correct)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (user_id, question_id)
+        DO UPDATE SET
+          selected_choice_id = EXCLUDED.selected_choice_id,
+          is_correct = EXCLUDED.is_correct,
+          lesson_id = EXCLUDED.lesson_id,
+          answered_at = CURRENT_TIMESTAMP
+      `, [user_id, lesson_id, question_id, selected_choice_id, is_correct]);
+
+      results.push({
+        question_id,
+        success: true,
+        is_correct
+      });
+    }
+
+    await client.query('COMMIT');
+    res.json({ success: true, results });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error in submitAnswers:', err);
+    res.status(500).json({ success: false, message: 'Submit failed' });
+  } finally {
+    client.release();
+  }
+}
+
+
+export async function getLeaderboard(req, res) {
+  const userId = req.user?.id; // ต้องมี middleware auth ก่อนหน้านี้
+  const client = await pool.connect();
+
+  try {
+    // ดึง top 7
+    const topUsersResult = await client.query(`
+      SELECT id, username, point, RANK() OVER (ORDER BY point DESC) AS rank
+      FROM users
+      ORDER BY point DESC
+      LIMIT 7
+    `);
+
+    const topUsers = topUsersResult.rows;
+
+    // ดึง rank ของ user ปัจจุบัน
+    let userRankResult = await client.query(`
+      SELECT id, username, point, rank FROM (
+        SELECT id, username, point, RANK() OVER (ORDER BY point DESC) AS rank
+        FROM users
+      ) AS ranked
+      WHERE id = $1
+    `, [userId]);
+
+    const currentUser = userRankResult.rows[0];
+
+    res.json({
+      success: true,
+      leaderboard: topUsers,
+      current_user: currentUser || null
+    });
+
+  } catch (err) {
+    console.error("Leaderboard error:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  } finally {
+    client.release();
+  }
+}

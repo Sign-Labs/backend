@@ -3,7 +3,9 @@ import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer  } from './database.js';
+import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer,checkAndAwardLessonCompletionFast 
+  ,multiplesubmitAnswers,getLeaderboard
+ } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
 
@@ -189,12 +191,24 @@ await redis.quit();
 
 app.get('/questions/:lessonId',authenticateToken ,getQuestionsByLesson);
 app.post('/answer', authenticateToken,submitAnswer);
+app.post('/multipleanswer', authenticateToken,multiplesubmitAnswers);
 
 
 
+app.post('/complete-lesson', authenticateToken, async (req, res) => {
+  const { lessonId } = req.body;
+  const userId = req.user.id;
+
+  try {
+    const result = await checkAndAwardLessonCompletionFast(userId, lessonId);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในเซิร์ฟเวอร์' });
+  }
+});
 
 
-
+app.get('/leaderboard', authenticateToken, getLeaderboard);
 
 
 app.listen(port, () => {
