@@ -625,3 +625,38 @@ export async function getLeaderboard(req, res) {
     client.release();
   }
 }
+
+
+
+
+export async function getCorrectChoice(req, res) {
+  const questionId = req.params.questionId;
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(`
+      SELECT 
+        id AS choice_id,
+        choice_text
+        
+      FROM choices
+      WHERE question_id = $1 AND is_correct = TRUE
+      LIMIT 1
+    `, [questionId]);
+
+    if (result.rowCount === 0) {
+      return res.status(404).json({ success: false, message: "Correct choice not found" });
+    }
+
+    res.json({
+      success: true,
+      answer: result.rows[0]
+    });
+
+  } catch (err) {
+    console.error("Error fetching correct choice:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  } finally {
+    client.release();
+  }
+}

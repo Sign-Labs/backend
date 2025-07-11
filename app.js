@@ -4,7 +4,7 @@ import { createClient } from 'redis';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer,checkAndAwardLessonCompletionFast 
-  ,multiplesubmitAnswers,getLeaderboard
+  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice
  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
@@ -209,6 +209,9 @@ app.post('/complete-lesson', authenticateToken, async (req, res) => {
 
 
 app.get('/leaderboard', authenticateToken, getLeaderboard);
+
+app.get('/hint/:questionId', authenticateToken, getCorrectChoice);
+
 
 
 app.listen(port, () => {
