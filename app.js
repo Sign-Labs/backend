@@ -92,12 +92,17 @@ app.post('/login', async (req, res) => {
 
 app.post('/send-otp', async (req, res) => {
   const { email } = req.body;
-  if (!email) return res.status(400).json({ error: 'Email is required' });
+  if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
 
-  const otp = await generateOtp(email);
-  await sendOtpEmail(email, otp,"Your OTP Code for Register",`<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`);
+  try {
+    const otp = await generateOtp(email);
+    await sendOtpEmail(email, otp, "Your OTP Code for Register", `<p>Your OTP code is: <strong>${otp}</strong></p><p>This code will expire in 5 minutes.</p>`);
 
-  res.json({ message: 'OTP sent to email' });
+    res.json({ success: true, message: 'OTP sent to email' });
+  } catch (err) {
+    console.error("Error sending OTP:", err);
+    res.status(500).json({ success: false, message: 'Failed to send OTP' });
+  }
 });
 
 
