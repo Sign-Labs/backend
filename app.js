@@ -4,7 +4,7 @@ import { createClient } from 'redis';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer,checkAndAwardLessonCompletionFast 
-  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice
+  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice,checkUserExists
  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
@@ -217,7 +217,7 @@ app.get('/leaderboard', authenticateToken, getLeaderboard);
 
 app.get('/hint/:questionId', authenticateToken, getCorrectChoice);
 
-
+app.post('/check-user', checkUserExists);
 
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);

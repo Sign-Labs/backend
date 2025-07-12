@@ -660,3 +660,38 @@ export async function getCorrectChoice(req, res) {
     client.release();
   }
 }
+
+export async function checkUserExists(req, res) {
+  const { username, email } = req.body;
+
+  if (!username || !email) {
+    return res.status(400).json({ success: false, message: "Username and email required" });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT username, email FROM users WHERE username = $1 OR email = $2`,
+      [username, email]
+    );
+
+    const conflicts = result.rows;
+
+    const conflictMessages = {
+      username: conflicts.find(u => u.username === username) ? 'Username already exists' : null,
+      email: conflicts.find(u => u.email === email) ? 'Email already exists' : null
+    };
+
+    if (conflictMessages.username || conflictMessages.email) {
+      return res.status(409).json({
+        success: false,
+        conflicts: conflictMessages
+      });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("Check user exists error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  }
+}
