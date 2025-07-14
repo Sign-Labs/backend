@@ -4,13 +4,13 @@ import { createClient } from 'redis';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer,checkAndAwardLessonCompletionFast 
-  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice,checkUserExists
+  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice,checkUserExists,updateUserStageProgress,getUserStageProgress,addUserPoint
  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port = 3000;
 
 // Middleware
 app.use(cors());
@@ -219,6 +219,33 @@ app.get('/hint/:questionId', authenticateToken, getCorrectChoice);
 
 app.post('/check-user', checkUserExists);
 
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
+app.post('/stage-progress',authenticateToken, updateUserStageProgress);
+app.get('/stage-progress/:user_id',authenticateToken, getUserStageProgress);
+
+app.post("/add-point",authenticateToken ,async (req, res) => {
+  const { user_id, amount } = req.body;
+
+  if (!user_id || typeof amount !== "number") {
+    return res.status(400).json({
+      success: false,
+      message: "user_id and amount (number) are required",
+    });
+  }
+
+  try {
+    const updatedUser = await addUserPoint(user_id, amount);
+    res.json({ success: true, user: updatedUser });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: "Failed to add point",
+    });
+  }
+});
+
+
+
+
+app.listen(3000, '0.0.0.0', () => {
+  console.log('Server running on http://0.0.0.0:3000');
 });

@@ -695,3 +695,102 @@ export async function checkUserExists(req, res) {
     res.status(500).json({ success: false, message: "Server error" });
   }
 }
+
+
+export async function updateUserStageProgress(req, res) {
+  const { user_id, stage_id } = req.body;
+  const client = await pool.connect();
+
+  try {
+    // ตรวจสอบ stage ปัจจุบันที่เคยบันทึกไว้
+    const existing = await client.query(
+      `SELECT last_stage_id FROM user_stage_progress WHERE user_id = $1`,
+      [user_id]
+    );
+
+    if (existing.rowCount > 0) {
+      const currentStage = existing.rows[0].last_stage_id;
+
+      // ถ้า stage เดิมหรือย้อนหลัง ไม่ต้อง update
+      if (stage_id <= currentStage) {
+        return res.json({ success: false, message: "Stage is not newer than current progress" });
+      }
+    }
+
+    // บันทึกหรืออัปเดต stage ที่ใหม่กว่า
+    await client.query(`
+      INSERT INTO user_stage_progress (user_id, last_stage_id)
+      VALUES ($1, $2)
+      ON CONFLICT (user_id)
+      DO UPDATE SET last_stage_id = EXCLUDED.last_stage_id
+    `, [user_id, stage_id]);
+
+    res.json({ success: true, message: "Progress updated" });
+
+  } catch (err) {
+    console.error('Error updating progress:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+}
+
+
+export async function getUserStageProgress(req, res) {
+  const user_id = parseInt(req.params.user_id);
+  const client = await pool.connect();
+
+  try {
+    const result = await client.query(`
+      SELECT 
+        usp.last_stage_id, 
+        s.chapter_number, 
+        s.stage_number, 
+        s.title
+      FROM user_stage_progress usp
+      JOIN stages s ON usp.last_stage_id = s.id
+      WHERE usp.user_id = $1
+      ORDER BY s.chapter_number DESC, s.stage_number DESC
+      LIMIT 1
+    `, [user_id]);
+
+    if (result.rowCount === 0) {
+      return res.json({ success: true, progress: null });
+    }
+
+    res.json({ success: true, progress: result.rows[0] });
+
+  } catch (err) {
+    console.error('Error fetching user stage progress:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  } finally {
+    client.release();
+  }
+}
+
+
+export async function addUserPoint(user_id, amount) {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // อัปเดตคะแนน
+    const result = await client.query(
+      `UPDATE users
+       SET point = point + $1
+       WHERE id = $2
+       RETURNING id, username, point`,
+      [amount, user_id]
+    );
+
+    await client.query('COMMIT');
+    return result.rows[0];
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Error adding points:", err);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
