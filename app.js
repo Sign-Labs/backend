@@ -58,12 +58,12 @@ app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
     // Additional validation
-    if (!username?.trim() || !password?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Username/email and password are required'
-      });
-    }
+    if (!username || !username.trim() || !password || !password.trim()) {
+  return res.status(400).json({
+    success: false,
+    message: 'Username/email and password are required'
+  });
+}
 
     const result = await login(req.body);
     res.status(200).json(result);
