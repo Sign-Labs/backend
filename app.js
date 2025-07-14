@@ -219,7 +219,7 @@ app.get('/hint/:questionId', authenticateToken, getCorrectChoice);
 
 app.post('/check-user', checkUserExists);
 
-app.post('/stage-progress',authenticateToken, updateUserStageProgress);
+app.post('/update-progress',authenticateToken, updateUserStageProgress);
 app.get('/stage-progress/:user_id',authenticateToken, getUserStageProgress);
 
 app.post("/add-point",authenticateToken ,async (req, res) => {

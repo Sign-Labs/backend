@@ -702,32 +702,54 @@ export async function updateUserStageProgress(req, res) {
   const client = await pool.connect();
 
   try {
+    await client.query("BEGIN");
+
     // ตรวจสอบ stage ปัจจุบันที่เคยบันทึกไว้
     const existing = await client.query(
       `SELECT last_stage_id FROM user_stage_progress WHERE user_id = $1`,
       [user_id]
     );
 
+    let shouldUpdate = true;
     if (existing.rowCount > 0) {
       const currentStage = existing.rows[0].last_stage_id;
 
-      // ถ้า stage เดิมหรือย้อนหลัง ไม่ต้อง update
       if (stage_id <= currentStage) {
-        return res.json({ success: false, message: "Stage is not newer than current progress" });
+        shouldUpdate = false;
       }
     }
 
+    if (!shouldUpdate) {
+      await client.query("ROLLBACK");
+      return res.json({ success: false, message: "Stage is not newer than current progress" });
+    }
+
     // บันทึกหรืออัปเดต stage ที่ใหม่กว่า
-    await client.query(`
+    await client.query(
+      `
       INSERT INTO user_stage_progress (user_id, last_stage_id)
       VALUES ($1, $2)
       ON CONFLICT (user_id)
       DO UPDATE SET last_stage_id = EXCLUDED.last_stage_id
-    `, [user_id, stage_id]);
+      `,
+      [user_id, stage_id]
+    );
 
-    res.json({ success: true, message: "Progress updated" });
+    await client.query(
+      `
+      UPDATE users
+      SET point = COALESCE(point, 0) + 20
+      WHERE id = $1
+      `,
+      [user_id]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({ success: true, message: "Progress updated and point added" });
 
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error('Error updating progress:', err);
     res.status(500).json({ success: false, message: 'Internal server error' });
   } finally {
@@ -742,16 +764,19 @@ export async function getUserStageProgress(req, res) {
 
   try {
     const result = await client.query(`
-      SELECT 
-        usp.last_stage_id, 
-        s.chapter_number, 
-        s.stage_number, 
-        s.title
-      FROM user_stage_progress usp
-      JOIN stages s ON usp.last_stage_id = s.id
-      WHERE usp.user_id = $1
-      ORDER BY s.chapter_number DESC, s.stage_number DESC
-      LIMIT 1
+     SELECT 
+  usp.last_stage_id, 
+  s.chapter_number, 
+  s.stage_number, 
+  s.title,
+  ucl.lesson_id
+FROM user_stage_progress usp
+JOIN stages s ON usp.last_stage_id = s.id
+LEFT JOIN user_completed_lessons ucl 
+  ON usp.user_id = ucl.user_id
+WHERE usp.user_id = $1
+ORDER BY s.chapter_number DESC, s.stage_number DESC
+LIMIT 1
     `, [user_id]);
 
     if (result.rowCount === 0) {
