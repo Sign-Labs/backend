@@ -139,14 +139,16 @@ app.post('/verify-otp', async (req, res) => {
 
 
 app.post('/forget-password', checkOtpVerified, async (req, res) => {
-  
   const { email, newPassword, confirmPassword } = req.body;
 
-  
-  await resetPassword(user.userData.email, newPassword, confirmPassword);
-  res.json({ message: "Password reset successful" });
-});
+  const result = await resetPassword(email, newPassword, confirmPassword);
 
+  if (result === true) {
+    res.json({ success: true, message: "Password reset successful" });
+  } else {
+    res.status(400).json({ success: false, message: result });
+  }
+});
 
 
 app.post('/change-password', authenticateToken, async (req, res) => {

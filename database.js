@@ -228,56 +228,46 @@ export async function checkOtpVerified(req, res, next) {
 
 
 export async function resetPassword(email, newPassword, confirmPassword) {
-   const client = await pool.connect();
+  const client = await pool.connect();
+
   if (!email || !newPassword || !confirmPassword) {
-    return res.status(400).json({ error: 'all field required' });
+    return "All fields are required";
   }
 
   if (newPassword !== confirmPassword) {
-   return res.status(400).json({ error: 'password not match' });
+    return "Passwords do not match";
   }
 
   const data = await redisClient.get(`otp:${email}`);
   if (!data) {
-   return res.status(400).json({ error: 'OTP not correct or expired' });
+    return "OTP not correct or expired";
   }
 
   const parsed = JSON.parse(data);
   if (!parsed.verified) {
-    return res.status(403).json({ error: 'Email not verified via OTP' });
+    return "Email not verified via OTP";
   }
 
-  
-  const passwordHash = await hashPassword(newPassword); 
-
-  // update password ใน DB
-const updateQuery = `
-    UPDATE users SET password = $1 WHERE email = $2
-    RETURNING id
-  `;
-
-  
-
   try {
-    const result = await client.query(updateQuery, [passwordHash, email]);
+    const passwordHash = await hashPassword(newPassword);
+    const result = await client.query(
+      `UPDATE users SET password = $1 WHERE email = $2 RETURNING id`,
+      [passwordHash, email]
+    );
 
     if (result.rowCount === 0) {
-      throw new Error('User not found');
+      return "User not found";
     }
 
-    // ✅ ลบ OTP key ออก (ความปลอดภัย)
     await redisClient.del(`otp:${email}`);
     return true;
 
+  } catch (err) {
+    console.error("DB error:", err);
+    return "Internal server error";
   } finally {
-     await redisClient.del(`otp:${email}`);
-     client.release(); 
-  return true;
-  
+    client.release();
   }
-
-
- 
 }
 
 
