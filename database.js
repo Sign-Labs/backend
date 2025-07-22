@@ -163,7 +163,9 @@ export async function login(loginData) {
 
 
 
-const redisClient = createClient();
+const redisClient = createClient({
+  url: process.env.REDIS_URL || 'redis://redis:6379'
+});
 await redisClient.connect();
 
 export async function generateOtp(email) {
