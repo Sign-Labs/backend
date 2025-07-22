@@ -8,6 +8,8 @@ import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,rese
  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
+import mqtt from "mqtt"; // import namespace "mqtt"
+let client = mqtt.connect("mqtt://test.mosquitto.org"); // create a client
 
 const app = express();
 const port = 3000;
@@ -244,6 +246,11 @@ app.post("/add-point",authenticateToken ,async (req, res) => {
     });
   }
 });
+
+
+
+
+
 
 
 
