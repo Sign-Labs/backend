@@ -184,15 +184,18 @@ app.get("/getdata",authenticateToken,getUserData);
 
 
 
-const redis = createClient();
+const redisClient = createClient({
+  url: process.env.REDIS_URL || 'redis://redis:6379'
+});
 
-redis.on('error', (err) => console.error('❌ Redis Error:', err));
-redis.on('connect', () => console.log('✅ Redis connected'));
+ redisClient.on('error', (err) => console.error('❌ Redis Error:', err));
+ redisClient.on('connect', () => console.log('✅ Redis connected'));
 
-await redis.connect();
+await  redisClient.connect();
 
-const pong = await redis.ping();
+const pong = await  redisClient.ping();
 console.log('📡 Redis PING response:', pong);
+
 
 
 
@@ -254,7 +257,7 @@ app.get("/api/:cat/:sub", async (req, res) => {
   const key = `mqtt:${topic}`;
 
   try {
-    const data = await redis.get(key);
+    const data = await  redisClient.get(key);
     if (data) {
       res.json({ topic, data });
     } else {
