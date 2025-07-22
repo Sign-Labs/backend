@@ -15,22 +15,25 @@ const brokerUrl = process.env.MQTT_BROKER_URL ;
 
 
 export function startMQTT() {
-  const client = mqtt.connect(brokerUrl);
+ const client= mqtt.connect(brokerUrl, {
+  username: process.env.MQTT_USERNAME,
+  password: process.env.MQTT_PASSWORD
+});
 
   client.on("connect", () => {
-    console.log(`✅ Connected to MQTT broker at ${brokerUrl}`);
+    console.log(` Connected to MQTT broker at ${brokerUrl}`);
     client.subscribe("#"); // subscribe ทุก topic
   });
 
   client.on("message", async (topic, message) => {
     const msg = message.toString();
-    console.log(`📨 MQTT: ${topic} → ${msg}`);
+    console.log(` MQTT: ${topic} → ${msg}`);
 
     try {
       await redisClient.set(`mqtt:${topic}`, msg, { EX: 300 }); // TTL 5 นาที
-      console.log(`✅ Saved to Redis (expires in 5 min): mqtt:${topic}`);
+      console.log(` Saved to Redis (expires in 5 min): mqtt:${topic}`);
     } catch (err) {
-      console.error("❌ Redis Error:", err);
+      console.error(" Redis Error:", err);
     }
   });
 }

@@ -8,11 +8,11 @@ import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,rese
  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
-import mqtt from "mqtt"; // import namespace "mqtt"
-let client = mqtt.connect("mqtt://test.mosquitto.org"); // create a client
 
+import { startMQTT } from './mqtt.js';
 const app = express();
 const port = 3000;
+startMQTT();
 
 // Middleware
 app.use(cors());
@@ -194,7 +194,7 @@ await redis.connect();
 const pong = await redis.ping();
 console.log('📡 Redis PING response:', pong);
 
-await redis.quit();
+
 
 
 
@@ -247,22 +247,23 @@ app.post("/add-point",authenticateToken ,async (req, res) => {
   }
 });
 
+
+
 app.get("/api/:cat/:sub", async (req, res) => {
   const topic = `${req.params.cat}/${req.params.sub}`;
   const key = `mqtt:${topic}`;
 
   try {
-    const data = await redisClient.get(key);
+    const data = await redis.get(key);
     if (data) {
       res.json({ topic, data });
     } else {
-      res.status(404).json({ error: "No data found (may be expired)" });
+      res.status(404).json({ error: "No data found or expired" });
     }
   } catch (err) {
     res.status(500).json({ error: "Redis error", details: err.message });
   }
 });
-
 
 
 
