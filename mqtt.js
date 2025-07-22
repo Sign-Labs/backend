@@ -7,7 +7,9 @@ import dotenv from 'dotenv';
 
 dotenv.config(); 
 
-const redisClient = createClient();
+const redisClient = createClient({
+  url: process.env.REDIS_URL || 'redis://redis:6379'
+});
 await redisClient.connect();
 const brokerUrl = process.env.MQTT_BROKER_URL ;
 
