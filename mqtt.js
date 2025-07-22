@@ -1,45 +1,36 @@
 import express from 'express';
-import axios from 'axios';
-import mqtt from "mqtt"; // import namespace "mqtt"
-let client = mqtt.connect("mqtt://test.mosquitto.org"); // create a client
+import mqtt from "mqtt"; 
+import { createClient } from 'redis';
 
 const app = express();
-app.use(express.json());
+import dotenv from 'dotenv';
 
-// Subscribe to MQTT topics
-client.on('connect', () => {
-  console.log('Connected to MQTT');
-  client.subscribe('device/+/status'); // wildcard topic
-});
+dotenv.config(); 
 
-// When a message is received
-client.on('message', async (topic, message) => {
-  const data = message.toString();
-  const apiPath = `/${topic}`; // แปลงเป็น API endpoint
-
-  try {
-    const res = await axios.post(`http://localhost:3000${apiPath}`, { data });
-    console.log('Forwarded to API:', res.data);
-  } catch (error) {
-    console.error('API error:', error.response?.data || error.message);
-  }
-});
+const redisClient = createClient();
+await redisClient.connect();
+const brokerUrl = process.env.MQTT_BROKER_URL ;
 
 
-client.on('connect', () => {
-  console.log('Connected to MQTT');
-  client.subscribe('device/+/status'); // wildcard topic
-});
 
-// When a message is received
-client.on('message', async (topic, message) => {
-  const data = message.toString();
-  const apiPath = `/${topic}`; // แปลงเป็น API endpoint
 
-  try {
-    const res = await axios.post(`http://localhost:3000${apiPath}`, { data });
-    console.log('Forwarded to API:', res.data);
-  } catch (error) {
-    console.error('API error:', error.response?.data || error.message);
-  }
-});
+export function startMQTT() {
+  const client = mqtt.connect(brokerUrl);
+
+  client.on("connect", () => {
+    console.log(`✅ Connected to MQTT broker at ${brokerUrl}`);
+    client.subscribe("#"); // subscribe ทุก topic
+  });
+
+  client.on("message", async (topic, message) => {
+    const msg = message.toString();
+    console.log(`📨 MQTT: ${topic} → ${msg}`);
+
+    try {
+      await redisClient.set(`mqtt:${topic}`, msg, { EX: 300 }); // TTL 5 นาที
+      console.log(`✅ Saved to Redis (expires in 5 min): mqtt:${topic}`);
+    } catch (err) {
+      console.error("❌ Redis Error:", err);
+    }
+  });
+}

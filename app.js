@@ -247,6 +247,21 @@ app.post("/add-point",authenticateToken ,async (req, res) => {
   }
 });
 
+app.get("/api/:cat/:sub", async (req, res) => {
+  const topic = `${req.params.cat}/${req.params.sub}`;
+  const key = `mqtt:${topic}`;
+
+  try {
+    const data = await redisClient.get(key);
+    if (data) {
+      res.json({ topic, data });
+    } else {
+      res.status(404).json({ error: "No data found (may be expired)" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Redis error", details: err.message });
+  }
+});
 
 
 
