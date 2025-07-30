@@ -1,0 +1,34 @@
+version: "3.8"
+
+services:
+  web:
+    build: .
+    ports:
+      - "3000:3000"
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - .env      # เพิ่มตรงนี้เพื่อโหลดไฟล์ .env
+    # ถ้าใช้ env_file แล้ว ไม่ต้องใส่ environment: ซ้ำ
+
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: signlab123
+      POSTGRES_DB: mydb
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
+
+  
