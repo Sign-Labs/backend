@@ -7,7 +7,7 @@ export async function hashPassword(password) {
 
     try {
         const hash = await bcrypt.hash(password, saltRounds);
-        // console.log("Hashed password is:", hash);
+        
         return hash;
     } catch (err) {
         console.log(err);
@@ -65,7 +65,7 @@ export function authenticateToken(req, res, next) {
     }
 
     console.log("JWT PASSED");
-    console.log('JWT payload:', user); // 👈 ตรวจว่า user มี id จริงไหม
+    console.log('JWT payload:', user); 
     req.user = user;
     next();
   });
@@ -80,4 +80,3 @@ export function decodeToken(token){
 
 
 
-//module.exports = {hashPassword, comparePassword,createToken, decodeToken, authenticateToken};
