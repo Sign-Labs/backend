@@ -811,3 +811,59 @@ export async function addUserPoint(user_id, amount) {
     client.release();
   }
 }
+
+
+export async function UpdateProfile(req, res) {
+  const client = await pool.connect();
+
+  try {
+    const userId = req.user.id; // ดึงจาก token ที่ผ่าน authenticateToken
+    if (!userId) {
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+    }
+
+    // ดึงข้อมูลจาก request body
+    const { username, name, surname, tel, sex, birthday, email, password } = req.body;
+
+    // ตรวจสอบว่าข้อมูลที่จำเป็นครบหรือไม่
+    if (!name || !surname || !tel || !sex || !birthday || !email) {
+      return res.status(400).json({ success: false, message: "Missing required fields" });
+    }
+  let newHashed = undefined;
+if (password) {
+  newHashed = await hashPassword(password);
+}
+
+let query = `
+  UPDATE users
+  SET username = $1,
+      name = $2,
+      surname = $3,
+      tel = $4,
+      sex = $5,
+      birthday = $6,
+      email = $7
+`;
+
+const params = [username, name, surname, tel, sex, birthday, email];
+
+if (newHashed) {
+  query += `, password = $8`;
+  params.push(newHashed);
+}
+
+query += ` WHERE id = $${params.length + 1}`;
+params.push(userId);
+
+await client.query(query, params);
+
+
+    res.json({ success: true, message: "Profile updated successfully" });
+
+  } catch (err) {
+    console.error("Error updating user profile:", err);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  } finally {
+    client.release();
+  }
+}

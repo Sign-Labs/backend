@@ -4,7 +4,7 @@ import { createClient } from 'redis';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer,checkAndAwardLessonCompletionFast 
-  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice,checkUserExists,updateUserStageProgress,getUserStageProgress,addUserPoint
+  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice,checkUserExists,updateUserStageProgress,getUserStageProgress,addUserPoint,UpdateProfile
  } from './database.js';
 import { authenticateToken } from './encryption.js';
 dotenv.config();
@@ -228,6 +228,7 @@ app.post('/check-user', checkUserExists);
 
 app.post('/update-progress',authenticateToken, updateUserStageProgress);
 app.get('/stage-progress/:user_id',authenticateToken, getUserStageProgress);
+app.put("/updateprofile", authenticateToken, UpdateProfile);
 
 app.post("/add-point",authenticateToken ,async (req, res) => {
   const { user_id, amount } = req.body;
