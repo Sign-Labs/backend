@@ -1,4 +1,4 @@
-import {pool} from './database.js';
+import {pool} from '../database.js';
 
 /**
  * @param {Object} lessonData - ข้อมูลบทเรียน
