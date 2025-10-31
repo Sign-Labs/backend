@@ -3,12 +3,13 @@ import { createClient } from 'redis';
 //const {hashPassword, comparePassword,createToken, decodeToken, authenticateToken}= require('./encryption')
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { register,login,generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,resetPassword,changePassword, getUserData,getQuestionsByLesson,submitAnswer,checkAndAwardLessonCompletionFast 
-  ,multiplesubmitAnswers,getLeaderboard,getCorrectChoice,checkUserExists,updateUserStageProgress,getUserStageProgress,addUserPoint,UpdateProfile
- } from './database.js';
+import {  getUserData, 
+  getLeaderboard,updateUserStageProgress,getUserStageProgress,UpdateProfile } from './info.js';
+ import { register,login } from './auth.js';
+ import{generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,} from './otp.js'
+ import{resetPassword}from './recovery.js'
 import { authenticateToken } from './encryption.js';
 dotenv.config();
-
 import { startMQTT } from './mqtt.js';
 const app = express();
 const port = 3000;
@@ -18,10 +19,6 @@ startMQTT();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// PostgreSQL connection pool
-
-
 
 
 
@@ -136,10 +133,6 @@ app.post('/verify-otp', async (req, res) => {
 
 
 
-
-
-
-
 app.post('/forget-password', checkOtpVerified, async (req, res) => {
   const { email, newPassword, confirmPassword } = req.body;
 
@@ -151,35 +144,6 @@ app.post('/forget-password', checkOtpVerified, async (req, res) => {
     res.status(400).json({ success: false, message: result });
   }
 });
-
-
-app.post('/change-password', authenticateToken, async (req, res) => {
-  const { currentPassword, newPassword, confirmPassword } = req.body;
-      const userId = req.user.id;
-  
-
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    return res.status(400).json({ error: 'All fields are required' });
-  }
-
-  if (newPassword !== confirmPassword) {
-    return res.status(400).json({ error: 'New passwords do not match' });
-  }
-
-  try {
-    await changePassword(userId, currentPassword, newPassword);
-    res.json({ message: 'Password changed successfully' });
-  } catch (err) {
-    res.status(400).json({ error: err.message });
-  }
-});
-
-
-app.get("/getdata",authenticateToken,getUserData);
-
-
-
-
 
 
 
@@ -201,55 +165,11 @@ console.log('📡 Redis PING response:', pong);
 
 
 
-app.get('/questions/:lessonId',authenticateToken ,getQuestionsByLesson);
-app.post('/answer', authenticateToken,submitAnswer);
-app.post('/multipleanswer', authenticateToken,multiplesubmitAnswers);
-
-
-
-app.post('/complete-lesson', authenticateToken, async (req, res) => {
-  const { lessonId } = req.body;
-  const userId = req.user.id;
-
-  try {
-    const result = await checkAndAwardLessonCompletionFast(userId, lessonId);
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ success: false, message: 'เกิดข้อผิดพลาดในเซิร์ฟเวอร์' });
-  }
-});
-
-
+app.get("/getdata",authenticateToken,getUserData);
 app.get('/leaderboard', authenticateToken, getLeaderboard);
-
-app.get('/hint/:questionId', authenticateToken, getCorrectChoice);
-
-app.post('/check-user', checkUserExists);
-
 app.post('/update-progress',authenticateToken, updateUserStageProgress);
 app.get('/stage-progress/:user_id',authenticateToken, getUserStageProgress);
 app.put("/updateprofile", authenticateToken, UpdateProfile);
-
-app.post("/add-point",authenticateToken ,async (req, res) => {
-  const { user_id, amount } = req.body;
-
-  if (!user_id || typeof amount !== "number") {
-    return res.status(400).json({
-      success: false,
-      message: "user_id and amount (number) are required",
-    });
-  }
-
-  try {
-    const updatedUser = await addUserPoint(user_id, amount);
-    res.json({ success: true, user: updatedUser });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to add point",
-    });
-  }
-});
 
 
 
@@ -268,8 +188,6 @@ app.get("/api/:cat/:sub", async (req, res) => {
     res.status(500).json({ error: "Redis error", details: err.message });
   }
 });
-
-
 
 
 
