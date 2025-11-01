@@ -5,7 +5,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import {  getUserData, 
   getLeaderboard,updateUserStageProgress,getUserStageProgress,UpdateProfile } from './info.js';
- import { register,login } from './auth.js';
+ import { register,login,checkUserExists } from './auth.js';
  import{generateOtp,sendOtpEmail,verifyOtp,checkOtpVerified,} from './otp.js'
  import{resetPassword}from './recovery.js'
 import { authenticateToken } from './encryption.js';
@@ -170,7 +170,7 @@ app.get('/leaderboard', authenticateToken, getLeaderboard);
 app.post('/update-progress',authenticateToken, updateUserStageProgress);
 app.get('/stage-progress/:user_id',authenticateToken, getUserStageProgress);
 app.put("/updateprofile", authenticateToken, UpdateProfile);
-
+app.post('/check-user', checkUserExists);
 
 
 app.get("/api/:cat/:sub", async (req, res) => {
